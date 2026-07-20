@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotação Aérea</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .cia-logo {
+            height: 16px;
+            width: auto;
+            object-fit: contain;
+            display: inline-block;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .header-divider {
+            height: 32px;
+            width: 1px;
+            background-color: rgba(255, 255, 255, 0.15);
+            margin: 0 24px;
+            display: none;
+        }
+
+        @media (min-width: 640px) {
+            .header-divider {
+                display: block;
+            }
+        }
+
+        /* Estilo da Data no Card */
+        .flight-date-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-top: 4px;
+            display: inline-block;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center py-12 px-4">
+
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight"><i
+                class="fas fa-plane-departure mr-3 text-blue-600"></i>Cotações</h1>
+        <p class="text-slate-500 mt-2 font-medium">Digite o código ou selecione abaixo</p>
+    </div>
+
+    <div class="relative w-full max-w-md mb-10 z-50">
+        <div class="flex gap-2 shadow-sm rounded-xl bg-white p-1.5 border border-slate-200 ring-1 ring-slate-100">
+            <div class="relative w-full">
+                <input type="text" id="searchInput" autocomplete="off" placeholder="Carregando cotações..."
+                    class="w-full border-none rounded-lg bg-transparent pl-4 pr-28 py-2.5 focus:outline-none focus:ring-0 text-slate-700 font-semibold placeholder:font-normal disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled>
+
+                <div id="status-icon" class="absolute right-3 top-3 text-slate-400 text-xs flex items-center gap-1">
+                    <span id="loading-text">Carregando...</span>
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+            </div>
+            <button type="button" id="searchButton" aria-label="Buscar cotação" title="Buscar cotação" disabled
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-lg font-bold transition shadow-lg shadow-blue-600/20 disabled:opacity-60 disabled:cursor-not-allowed">
+                <i class="fas fa-search"></i>
+            </button>
+            <button type="button" id="exportBtnGlobal" aria-label="Exportar" title="Exportar Cotação" onclick="exportarCotacaoGlobal(this)"
+                class="hidden bg-slate-800 hover:bg-slate-900 text-white px-5 rounded-lg font-bold transition shadow-lg shadow-slate-800/20 flex items-center justify-center">
+                <i class="fas fa-camera"></i>
+            </button>
+        </div>
+        <div id="dropdown-sugestoes"
+            class="hidden absolute w-full bg-white mt-2 rounded-xl shadow-xl overflow-hidden border border-slate-100 max-h-60 overflow-y-auto ring-1 ring-black/5">
+        </div>
+    </div>
+
+    <div id="resultado" class="w-full max-w-4xl hidden z-10"></div>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        const sheetPubId = '2PACX-1vQHjNCs4f4z5cWQirNoIaSjL3aCT3Roy6G_rVY4aP2DBINf3KwP_07bYAqsays5x-4WhuE9b1MuEZRT';
+        const sheetGid = '875103531';
+        const sheetName = 'COTAÇÃO';
+        const sheetUrl = `https://docs.google.com/spreadsheets/d/e/${sheetPubId}/gviz/tq`;
+        const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbyIiRNRk3eyw9Bi1B_VOohfaG2uhOkutFhYlMSl3fa9Pvxhqu-_Dp1TAlMfsQj5Ej02/exec'; // Cole aqui a URL /exec do Google Apps Script.
+
+
+
+        // --- BANCO DE AEROPORTOS ---
+        let bancoAeroportos = {
+            'GYN': 'Goiânia', 'IGU': 'Foz do Iguaçu', 'FOR': 'Fortaleza', 'GRU': 'São Paulo', 'CGH': 'São Paulo', 'VCP': 'Campinas',
+            'GIG': 'Rio de Janeiro', 'SDU': 'Rio de Janeiro', 'BSB': 'Brasília', 'SSA': 'Salvador', 'REC': 'Recife',
+            'CNF': 'Belo Horizonte', 'POA': 'Porto Alegre', 'CWB': 'Curitiba', 'MAO': 'Manaus', 'BEL': 'Belém',
+            'FLN': 'Florianópolis', 'VIX': 'Vitória', 'NAT': 'Natal', 'MCZ': 'Maceió', 'JPA': 'João Pessoa',
+            'SLZ': 'São Luís', 'CGB': 'Cuiabá', 'CGR': 'Campo Grande', 'THE': 'Teresina', 'AJU': 'Aracaju',
+            'PVH': 'Porto Velho', 'RBR': 'Rio Branco', 'MCP': 'Macapá', 'PMW': 'Palmas', 'BVB': 'Boa Vista',
+            'MIA': 'Miami', 'MCO': 'Orlando', 'JFK': 'Nova York', 'LIS': 'Lisboa', 'OPO': 'Porto', 'MAD': 'Madri',
+            'CDG': 'Paris', 'EZE': 'Buenos Aires', 'LHR': 'Londres', 'FCO': 'Roma', 'DXB': 'Dubai', 'MVD': 'Montevidéu'
+        };
+
+        let todosOsDados = [];
+        let estadoCarregamento = 'carregando';
+
+        const limparID = (val) => String(val || '').toLowerCase().replace('ct', '').replace(/[^0-9]/g, '');
+        const textoSeguro = (val) => String(val ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+        }[char]));
+
+        function atualizarEstado(estado, mensagem = '') {
+            estadoCarregamento = estado;
+            const input = document.getElementById('searchInput');
+            const botao = document.getElementById('searchButton');
+            const status = document.getElementById('status-icon');
+
+            if (estado === 'carregando') {
+                input.disabled = true;
+                botao.disabled = true;
+                input.placeholder = 'Carregando cotações...';
+                status.innerHTML = '<span id="loading-text">Carregando...</span><i class="fas fa-spinner fa-spin"></i>';
+                return;
+            }
+
+            if (estado === 'pronto') {
+                input.disabled = false;
+                botao.disabled = false;
+                input.placeholder = 'Buscar cotação (ex: ct1)...';
+                status.innerHTML = '<i class="fas fa-check text-emerald-500" title="Cotações carregadas"></i>';
+                return;
+            }
+
+            input.disabled = true;
+            botao.disabled = true;
+            input.placeholder = 'Cotações indisponíveis';
+            status.innerHTML = '<button type="button" id="retryLoadButton" class="text-red-500 hover:text-red-600" title="Tentar carregar novamente"><i class="fas fa-wifi"></i></button>';
+            document.getElementById('retryLoadButton').addEventListener('click', carregarDados);
+            mostrarMensagemSistema(
+                'erro',
+                'Não foi possível carregar as cotações',
+                mensagem || 'Verifique sua conexão e tente novamente.'
+            );
+        }
+
+        function mostrarMensagemSistema(tipo, titulo, mensagem) {
+            const estilos = {
+                erro: { icon: 'fa-triangle-exclamation', cor: 'text-red-500', fundo: 'bg-red-50', borda: 'border-red-100' },
+                aviso: { icon: 'fa-circle-info', cor: 'text-amber-500', fundo: 'bg-amber-50', borda: 'border-amber-100' }
+            };
+            const estilo = estilos[tipo] || estilos.aviso;
+            const div = document.getElementById('resultado');
+            div.innerHTML = `
+                <div class="${estilo.fundo} ${estilo.borda} border rounded-xl px-5 py-4 text-center shadow-sm animate-fade-in-up">
+                    <i class="fas ${estilo.icon} ${estilo.cor} mb-2"></i>
+                    <p class="text-sm font-bold text-slate-700">${textoSeguro(titulo)}</p>
+                    <p class="text-xs text-slate-500 mt-1">${textoSeguro(mensagem)}</p>
+                    ${tipo === 'erro' ? '<button type="button" id="retryMessageButton" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition">Tentar novamente</button>' : ''}
+                </div>
+            `;
+            div.classList.remove('hidden');
+            const retryButton = document.getElementById('retryMessageButton');
+            if (retryButton) retryButton.addEventListener('click', carregarDados);
+        }
+
+        function carregarPlanilhaAppsScript(timeoutMs = 15000) {
+            return new Promise((resolve, reject) => {
+                const callbackName = `receberCotacoesApps_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                const script = document.createElement('script');
+                let finalizado = false;
+                const timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('Tempo limite ao carregar a ponte do Apps Script'));
+                }, timeoutMs);
+
+                function cleanup() {
+                    if (finalizado) return;
+                    finalizado = true;
+                    clearTimeout(timeoutId);
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    delete window[callbackName];
+                }
+
+                window[callbackName] = (payload) => {
+                    cleanup();
+
+                    if (!payload || payload.status !== 'ok' || !Array.isArray(payload.data)) {
+                        reject(new Error(payload?.message || 'Resposta inválida da ponte do Apps Script'));
+                        return;
+                    }
+
+                    resolve(payload.data);
+                };
+
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error('Não foi possível carregar a ponte do Apps Script'));
+                };
+
+                const separador = appsScriptUrl.includes('?') ? '&' : '?';
+                script.src = `${appsScriptUrl}${separador}callback=${encodeURIComponent(callbackName)}&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function carregarPlanilhaGoogle(timeoutMs = 15000) {
+            const tentativas = [
+                { url: `${sheetUrl}?gid=${encodeURIComponent(sheetGid)}&headers=0`, modo: 'google' },
+                { url: `${sheetUrl}?sheet=${encodeURIComponent(sheetName)}&headers=0`, modo: 'google' },
+                { url: `${sheetUrl}?gid=${encodeURIComponent(sheetGid)}`, modo: 'google' },
+                { url: `${sheetUrl}?gid=${encodeURIComponent(sheetGid)}&headers=0`, modo: 'jsonp' },
+                { url: `${sheetUrl}?sheet=${encodeURIComponent(sheetName)}&headers=0`, modo: 'jsonp' }
+            ];
+
+            let ultimoErro = null;
+            for (const tentativa of tentativas) {
+                try {
+                    return await carregarPlanilhaGooglePorUrl(tentativa.url, tentativa.modo, timeoutMs);
+                } catch (err) {
+                    ultimoErro = err;
+                    console.warn('Falha ao carregar planilha:', err);
+                }
+            }
+
+            throw ultimoErro || new Error('Não foi possível carregar a planilha');
+        }
+
+        function carregarPlanilhaGooglePorUrl(url, modo = 'google', timeoutMs = 15000) {
+            return new Promise((resolve, reject) => {
+                const callbackName = `receberCotacoes_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                const script = document.createElement('script');
+                const googleAnterior = window.google;
+                let finalizado = false;
+                const timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('Tempo limite ao carregar a planilha'));
+                }, timeoutMs);
+
+                function cleanup() {
+                    if (finalizado) return;
+                    finalizado = true;
+                    clearTimeout(timeoutId);
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    delete window[callbackName];
+
+                    if (googleAnterior === undefined) {
+                        delete window.google;
+                    } else {
+                        window.google = googleAnterior;
+                    }
+                }
+
+                function receberResposta(response) {
+                    cleanup();
+
+                    if (!response || response.status !== 'ok' || !response.table) {
+                        const erro = response?.errors?.[0]?.detailed_message || response?.errors?.[0]?.reason || 'Resposta inválida da planilha';
+                        reject(new Error(erro));
+                        return;
+                    }
+
+                    resolve(converterTabelaGoogle(response.table));
+                }
+
+                window[callbackName] = receberResposta;
+                window.google = window.google || {};
+                window.google.visualization = window.google.visualization || {};
+                window.google.visualization.Query = window.google.visualization.Query || {};
+                window.google.visualization.Query.setResponse = receberResposta;
+
+                script.onload = () => {
+                    setTimeout(() => {
+                        if (!finalizado) {
+                            cleanup();
+                            reject(new Error('A planilha respondeu sem chamar o callback de dados'));
+                        }
+                    }, 0);
+                };
+
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error('Não foi possível carregar o script da planilha'));
+                };
+
+                const params = [
+                    modo === 'jsonp'
+                        ? `tqx=out:json;responseHandler:${callbackName}`
+                        : `tqx=reqId:${Date.now()}`,
+                    `tq=${encodeURIComponent('select *')}`,
+                    `_=${Date.now()}`
+                ].join('&');
+                script.src = `${url}&${params}`;
+                document.head.appendChild(script);
+            });
+        }
+
+        function converterTabelaGoogle(table) {
+            return (table.rows || []).map(row => {
+                return (row.c || []).map(cell => {
+                    if (!cell) return '';
+                    return cell.f ?? cell.v ?? '';
+                });
+            });
+        }
+
+        async function carregarAeroportosLocais() {
+            if (window.location.protocol === 'file:') return;
+            try {
+                const respLocal = await fetch('Códigos de Aeroportos.html');
+                if (respLocal.ok) parseAeroportosLocais(await respLocal.text());
+            } catch (e) { }
+        }
+
+        async function carregarAeroportosExternos() {
+            try {
+                const resp = await fetch('https://raw.githubusercontent.com/algolia/datasets/master/airports/airports.json');
+                if (resp.ok) {
+                    const airports = await resp.json();
+                    airports.forEach(a => {
+                        if (a.iata_code && !bancoAeroportos[a.iata_code]) {
+                            bancoAeroportos[a.iata_code] = a.city;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Erro ao carregar aeroportos externos', e);
+            }
+        }
+
+        async function carregarDados() {
+            atualizarEstado('carregando');
+            document.getElementById('resultado').classList.add('hidden');
+            await carregarAeroportosLocais();
+            await carregarAeroportosExternos();
+
+            try {
+                const linhas = appsScriptUrl.trim()
+                    ? await carregarPlanilhaAppsScript()
+                    : await carregarPlanilhaGoogle();
+                todosOsDados = linhas.filter(row => {
+                    const id = limparID(row[0]);
+                    return id && !Number.isNaN(Number(id));
+                });
+
+                if (todosOsDados.length === 0) throw new Error('Planilha vazia ou sem códigos válidos');
+                atualizarEstado('pronto');
+            } catch (err) {
+                console.error(err);
+                todosOsDados = [];
+                atualizarEstado('erro', `Verifique se a planilha continua publicada na Web. Detalhe: ${err.message}`);
+            }
+        }
+
+        function parseAeroportosLocais(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const infos = doc.querySelectorAll('.country-airports-info');
+            infos.forEach(div => {
+                const codeEl = div.querySelector('.airport-code');
+                const cityEl = div.querySelector('.airport-city-country');
+                if (codeEl && cityEl) {
+                    const code = codeEl.innerText.trim();
+                    const city = cityEl.innerText.split(',')[0].trim();
+                    bancoAeroportos[code] = city;
+                }
+            });
+        }
+
+        function getCidade(codigo) {
+            if (!codigo) return '';
+            const code = codigo.trim().toUpperCase();
+            return bancoAeroportos[code] || code;
+        }
+
+        function parseTrecho(txt) {
+            if (!txt) {
+                return { oCode: '???', dCode: '???', oCity: '???', dCity: '???' };
+            }
+
+            const parts = String(txt).split(/\s+(?:v|x|-)\s+/i).map(part => part.trim()).filter(Boolean);
+            const oCode = parts[0] || '???';
+            const dCode = parts[1] || '???';
+
+            return {
+                oCode,
+                dCode,
+                oCity: getCidade(oCode),
+                dCity: getCidade(dCode)
+            };
+        }
+
+        const logosCia = {
+            'gol': './assets/gol.png',
+            'azul': './assets/azul.png',
+            'latam': './assets/latam.png'
+        };
+
+        function getLogoHtml(nomeCia) {
+            if (!nomeCia) return '';
+            const nomeLower = nomeCia.toLowerCase();
+            let url = '';
+            if (nomeLower.includes('gol')) url = logosCia.gol;
+            else if (nomeLower.includes('azul')) url = logosCia.azul;
+            else if (nomeLower.includes('latam')) url = logosCia.latam;
+            return url ? `<img src="${url}" alt="${textoSeguro(nomeCia)}" class="cia-logo">` : `<span class="text-xs font-bold text-slate-500 uppercase">${textoSeguro(nomeCia)}</span>`;
+        }
+
+        function formatarDataExtensa(dataStr) {
+            if (!dataStr) return '';
+            const parts = dataStr.split('/');
+            if (parts.length !== 3) return dataStr;
+
+            let day = parseInt(parts[0]);
+            let month = parseInt(parts[1]) - 1;
+            let year = parseInt(parts[2]);
+            if (year < 100) year += 2000;
+
+            const date = new Date(year, month, day);
+            let weekDay = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+            weekDay = weekDay.replace('-feira', '').toLowerCase();
+            let monthName = date.toLocaleDateString('pt-BR', { month: 'short' });
+
+            return `${weekDay}, ${day} de ${monthName}`;
+        }
+
+        // --- UI ---
+        function mostrarDropdown() {
+            if (estadoCarregamento === 'pronto') {
+                filtrarSugestoes();
+                document.getElementById('dropdown-sugestoes').classList.remove('hidden');
+            }
+        }
+
+        document.addEventListener('click', e => {
+            const caixaBusca = document.querySelector('.relative.w-full');
+            if (caixaBusca && !caixaBusca.contains(e.target)) {
+                document.getElementById('dropdown-sugestoes').classList.add('hidden');
+            }
+        });
+
+        function filtrarSugestoes() {
+            if (estadoCarregamento !== 'pronto') return;
+
+            const termo = limparID(document.getElementById('searchInput').value);
+            const lista = document.getElementById('dropdown-sugestoes');
+            let items = termo === '' ? todosOsDados.slice(-3).reverse() : todosOsDados.filter(r => limparID(r[0]).includes(termo));
+
+            lista.innerHTML = '';
+            if (items.length === 0) {
+                const vazio = document.createElement('div');
+                vazio.className = 'p-4 text-slate-400 text-xs text-center font-medium';
+                vazio.textContent = 'Nenhuma cotação encontrada';
+                lista.appendChild(vazio);
+                return;
+            }
+
+            items.forEach(r => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'w-full px-5 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50 flex justify-between items-center transition text-left';
+
+                const conteudo = document.createElement('div');
+                conteudo.className = 'flex items-center gap-3';
+
+                const badge = document.createElement('span');
+                badge.className = 'bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-md';
+                badge.textContent = `#${r[0]}`;
+
+                const destino = document.createElement('span');
+                destino.className = 'text-sm text-slate-600 font-semibold';
+                destino.textContent = parseTrecho(r[5]).dCity || 'Viagem';
+
+                const seta = document.createElement('i');
+                seta.className = 'fas fa-chevron-right text-slate-300 text-xs';
+                seta.setAttribute('aria-hidden', 'true');
+
+                conteudo.append(badge, destino);
+                item.append(conteudo, seta);
+                item.addEventListener('click', () => {
+                    document.getElementById('searchInput').value = `ct${limparID(r[0])}`;
+                    lista.classList.add('hidden');
+                    renderizarVoo(r);
+                });
+                lista.appendChild(item);
+            });
+            lista.classList.remove('hidden');
+        }
+
+        function acionarBuscaManual() {
+            if (estadoCarregamento === 'carregando') {
+                mostrarMensagemSistema('aviso', 'Ainda carregando', 'Aguarde alguns segundos e tente novamente.');
+                return;
+            }
+
+            if (estadoCarregamento === 'erro') {
+                mostrarMensagemSistema('erro', 'Cotações indisponíveis', 'Não foi possível carregar a planilha. Tente novamente.');
+                return;
+            }
+
+            const id = limparID(document.getElementById('searchInput').value);
+            if (!id) {
+                mostrarMensagemSistema('aviso', 'Digite um código', 'Informe o número da cotação, como 94 ou ct94.');
+                return;
+            }
+
+            const r = todosOsDados.find(x => limparID(x[0]) === id);
+            if (r) {
+                renderizarVoo(r);
+                document.getElementById('dropdown-sugestoes').classList.add('hidden');
+                return;
+            }
+
+            mostrarMensagemSistema('aviso', 'Cotação não encontrada', `Não achei nenhuma cotação com o código ct${id}.`);
+        }
+
+        // --- RENDERIZADOR ---
+        function renderizarVoo(row) {
+            const dados = {
+                id: row[0], pax: row[1],
+                idaData: row[2], idaHora: row[3], idaDuracao: row[4], idaTrecho: row[5], idaTipo: row[6], idaCia: row[7], idaChegada: row[24], idaTaxa: row[9],
+                voltaData: row[11], voltaHora: row[12], voltaDuracao: row[13], voltaTrecho: row[14], voltaTipo: row[15], voltaCia: row[16], voltaChegada: row[26], voltaTaxa: row[18],
+                precoPorPessoa: row[21]
+            };
+
+            const tratarValor = (str) => {
+                if (!str) return 0;
+                const valor = String(str).replace(/[^\d,.-]/g, '').trim();
+                if (!valor) return 0;
+
+                const usaVirgulaDecimal = valor.lastIndexOf(',') > valor.lastIndexOf('.');
+                const normalizado = usaVirgulaDecimal
+                    ? valor.replace(/\./g, '').replace(',', '.')
+                    : valor.replace(/,/g, '');
+                const numero = parseFloat(normalizado);
+
+                return Number.isFinite(numero) ? numero : 0;
+            };
+
+            const formatarMoeda = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            const formatarNumero = (valor) => valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const taxaIdaNum = tratarValor(dados.idaTaxa);
+            const taxaVoltaNum = tratarValor(dados.voltaTaxa);
+            const paxNum = Math.max(parseInt(dados.pax, 10) || 0, 0);
+            const valTotalPessoa = tratarValor(dados.precoPorPessoa);
+
+            const valTaxasPessoa = taxaIdaNum + taxaVoltaNum;
+            const valBasePessoa = valTotalPessoa - valTaxasPessoa;
+
+            const totalGeral = formatarMoeda(valTotalPessoa * paxNum);
+            const totalTaxas = formatarMoeda((taxaIdaNum + taxaVoltaNum) * paxNum);
+            const valBasePessoaFmt = formatarNumero(valBasePessoa);
+            const valTaxasPessoaFmt = formatarNumero(valTaxasPessoa);
+            const precoPorPessoaFmt = formatarNumero(valTotalPessoa);
+            const tIda = parseTrecho(dados.idaTrecho);
+            const tVolta = parseTrecho(dados.voltaTrecho);
+            const idaDireto = String(dados.idaTipo || '').toLowerCase().includes('direto');
+            const voltaDireto = String(dados.voltaTipo || '').toLowerCase().includes('direto');
+            const whatsappText = encodeURIComponent(`Olá, gostaria de fechar a cotação ct${limparID(dados.id)} (Total: ${totalGeral})`);
+
+            const html = `
+                <div class="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 animate-fade-in-up overflow-hidden">
+                    
+                    <div class="bg-gradient-to-r from-blue-900 to-blue-700 p-6 text-white flex flex-col sm:flex-row items-center justify-between relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform translate-x-10 -translate-y-5">
+                            <i class="fas fa-plane text-9xl"></i>
+                        </div>
+
+                        <div class="flex items-center gap-5 w-full sm:w-auto justify-center sm:justify-start z-10">
+                            <div class="text-right">
+                                <span class="font-extrabold text-xl sm:text-2xl leading-none block">${textoSeguro(tIda.oCity)}</span>
+                                <span class="text-xs text-blue-200 font-medium tracking-wide opacity-80 uppercase">${textoSeguro(tIda.oCode)}</span>
+                            </div>
+                            
+                            <i class="fas fa-arrow-right text-blue-400 text-sm"></i>
+                            
+                            <div class="text-left">
+                                <span class="font-extrabold text-xl sm:text-2xl leading-none block">${textoSeguro(tIda.dCity)}</span>
+                                <span class="text-xs text-blue-200 font-medium tracking-wide opacity-80 uppercase">${textoSeguro(tIda.dCode)}</span>
+                            </div>
+                        </div>
+
+                        <div class="header-divider"></div>
+                        <div class="flex items-center gap-3 my-4 sm:my-0 bg-blue-800/40 px-4 py-2 rounded-lg border border-white/10 backdrop-blur-sm z-10">
+                            <i class="far fa-calendar-alt text-blue-300"></i>
+                            <span class="font-semibold text-sm tracking-wide">${textoSeguro(dados.idaData)} - ${textoSeguro(dados.voltaData)}</span>
+                        </div>
+                        <div class="header-divider"></div>
+                        <div class="flex items-center gap-2 z-10">
+                            <div class="bg-white/10 p-2 rounded-full"><i class="far fa-user text-blue-200 text-xs"></i></div>
+                            <span class="font-semibold text-sm">${textoSeguro(dados.pax)} Passageiro(s)</span>
+                        </div>
+                    </div>
+
+                    <div class="p-6 sm:p-8 space-y-10">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-6 pl-6 border-l-[3px] border-blue-600 relative">
+                            <div class="absolute -left-[9px] top-0 h-4 w-4 bg-white border-[3px] border-blue-600 rounded-full"></div>
+                            <div class="min-w-[100px] flex flex-col justify-center items-start">
+                                <div class="mb-2 h-6 flex items-center">${getLogoHtml(dados.idaCia)}</div>
+                                <span class="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-1">IDA</span>
+                                <span class="flight-date-badge bg-blue-50 text-blue-700 border border-blue-100">${textoSeguro(formatarDataExtensa(dados.idaData))}</span>
+                            </div>
+                            <div class="flex-1 flex items-center justify-between gap-4">
+                                <div class="text-center min-w-[60px]">
+                                    <div class="text-2xl font-bold text-slate-800">${textoSeguro(dados.idaHora)}</div>
+                                    <div class="text-xs text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">${textoSeguro(tIda.oCode)}</div>
+                                </div>
+                                <div class="flex flex-col items-center flex-1 px-4 self-center">
+                                    <span class="text-xs text-slate-500 font-bold mb-3">${textoSeguro(dados.idaDuracao)}</span>
+                                    <div class="w-full h-[2px] bg-slate-200 relative flex items-center justify-center rounded-full">
+                                        <div class="absolute bg-white px-3 flex items-center justify-center">
+                                            <i class="fas fa-plane text-slate-300 transform rotate-90 text-xs"></i>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] mt-3 font-extrabold uppercase tracking-widest ${idaDireto ? 'text-emerald-600' : 'text-orange-500'}">${textoSeguro(dados.idaTipo)}</span>
+                                    
+                                    <div class="flex gap-4 mt-5 justify-center items-end">
+                                        <div class="flex flex-col items-center justify-end" title="Item Pessoal Incluso">
+                                            <i class="fa-solid fa-briefcase text-blue-600 text-sm mb-0.5"></i>
+                                        </div>
+                                        <div class="flex flex-col items-center justify-end" title="Mala de Mão 10kg Inclusa">
+                                            <i class="fa-solid fa-suitcase-rolling text-blue-600 text-lg"></i>
+                                        </div>
+                                        <div class="flex flex-col items-center justify-end" title="Mala Despachada Não Inclusa">
+                                            <i class="fa-solid fa-suitcase text-slate-300 text-xl opacity-60"></i>
+                                        </div>
+                                    </div>
+
+                                </div>
+                                <div class="text-center min-w-[60px]">
+                                    <div class="text-2xl font-bold text-slate-800">${textoSeguro(dados.idaChegada)}</div>
+                                    <div class="text-xs text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">${textoSeguro(tIda.dCode)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-6 pl-6 border-l-[3px] border-orange-500 relative">
+                            <div class="absolute -left-[9px] top-0 h-4 w-4 bg-white border-[3px] border-orange-500 rounded-full"></div>
+                            <div class="min-w-[100px] flex flex-col justify-center items-start">
+                                <div class="mb-2 h-6 flex items-center">${getLogoHtml(dados.voltaCia)}</div>
+                                <span class="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-1">VOLTA</span>
+                                <span class="flight-date-badge bg-orange-50 text-orange-700 border border-orange-100">${textoSeguro(formatarDataExtensa(dados.voltaData))}</span>
+                            </div>
+                            <div class="flex-1 flex items-center justify-between gap-4">
+                                <div class="text-center min-w-[60px]">
+                                    <div class="text-2xl font-bold text-slate-800">${textoSeguro(dados.voltaHora)}</div>
+                                    <div class="text-xs text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">${textoSeguro(tVolta.oCode)}</div>
+                                </div>
+                                <div class="flex flex-col items-center flex-1 px-4 self-center">
+                                    <span class="text-xs text-slate-500 font-bold mb-3">${textoSeguro(dados.voltaDuracao)}</span>
+                                    <div class="w-full h-[2px] bg-slate-200 relative flex items-center justify-center rounded-full">
+                                        <div class="absolute bg-white px-3 flex items-center justify-center">
+                                            <i class="fas fa-plane text-slate-300 transform -rotate-90 text-xs"></i>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] mt-3 font-extrabold uppercase tracking-widest ${voltaDireto ? 'text-emerald-600' : 'text-orange-500'}">${textoSeguro(dados.voltaTipo)}</span>
+
+                                    <div class="flex gap-4 mt-5 justify-center items-end">
+                                        <div class="flex flex-col items-center justify-end" title="Item Pessoal Incluso">
+                                            <i class="fa-solid fa-briefcase text-orange-600 text-sm mb-0.5"></i>
+                                        </div>
+                                        <div class="flex flex-col items-center justify-end" title="Mala de Mão 10kg Inclusa">
+                                            <i class="fa-solid fa-suitcase-rolling text-orange-600 text-lg"></i>
+                                        </div>
+                                        <div class="flex flex-col items-center justify-end" title="Mala Despachada Não Inclusa">
+                                            <i class="fa-solid fa-suitcase text-slate-300 text-xl opacity-60"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-center min-w-[60px]">
+                                    <div class="text-2xl font-bold text-slate-800">${textoSeguro(dados.voltaChegada)}</div>
+                                    <div class="text-xs text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">${textoSeguro(tVolta.dCode)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-6">
+                        <div class="text-center sm:text-left">
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Por passageiro</p>
+                            
+                            <p class="text-xs text-slate-500 font-medium mb-1">
+                                R$ ${textoSeguro(valBasePessoaFmt)} + R$ ${textoSeguro(valTaxasPessoaFmt)} taxas
+                            </p>
+
+                            <div class="flex items-center justify-center sm:justify-start gap-2">
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-sm text-slate-500 font-medium">R$</span>
+                                    <span class="text-3xl font-extrabold text-slate-800 tracking-tight">${textoSeguro(precoPorPessoaFmt)}</span>
+                                </div>
+                                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wide">No Pix</span>
+                            </div>
+                            
+                            <p class="text-xs text-slate-400 mt-3 flex items-center justify-center sm:justify-start gap-1">
+                                <i class="fas fa-info-circle text-slate-300"></i>
+                                Taxas e impostos: <span class="font-bold text-slate-600">${textoSeguro(totalTaxas)}</span>
+                            </p>
+
+                            <p class="text-xs text-slate-500 mt-1 font-medium bg-white px-2 py-1 rounded border border-slate-200 inline-block shadow-sm">
+                                Total da viagem: <span class="font-bold text-slate-700">${textoSeguro(totalGeral)}</span>
+                            </p>
+                        </div>
+                        <div class="acoes-exportar flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            <a href="https://wa.me/?text=${whatsappText}" target="_blank" rel="noopener noreferrer" class="bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl px-8 py-4 text-sm transition transform hover:-translate-y-1 shadow-lg shadow-green-500/30 w-full sm:w-auto text-center flex items-center justify-center gap-2">
+                                <i class="fab fa-whatsapp text-lg"></i> Solicitar Reserva
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            const div = document.getElementById('resultado');
+            div.innerHTML = html;
+            div.classList.remove('hidden');
+            div.dataset.cotacaoId = dados.id;
+
+            const btnGlobal = document.getElementById('exportBtnGlobal');
+            if (btnGlobal) btnGlobal.classList.remove('hidden');
+        }
+
+        async function exportarCotacaoGlobal(btnElement) {
+            const divResultado = document.getElementById('resultado');
+            const container = divResultado.querySelector('.bg-white.rounded-2xl');
+            const idCotacao = divResultado.dataset.cotacaoId || 'cotacao';
+            if (!container) return;
+
+            const acoes = container.querySelector('.acoes-exportar');
+            
+            const iconeOriginal = btnElement.innerHTML;
+            btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btnElement.disabled = true;
+            
+            // Esconde os botões mantendo o layout (reserva whatsapp)
+            if (acoes) acoes.style.visibility = 'hidden';
+
+            try {
+                const dataUrl = await htmlToImage.toPng(container, {
+                    pixelRatio: 2,
+                    backgroundColor: '#ffffff',
+                    style: { margin: '0' }
+                });
+                
+                const link = document.createElement('a');
+                link.download = `cotacao_ct${idCotacao}.png`;
+                link.href = dataUrl;
+                link.click();
+            } catch(e) {
+                console.error('Erro ao exportar', e);
+                alert('Erro ao gerar a imagem da cotação. Detalhe: ' + e.message);
+            } finally {
+                if (acoes) acoes.style.visibility = 'visible';
+                btnElement.innerHTML = iconeOriginal;
+                btnElement.disabled = false;
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('focus', mostrarDropdown);
+        document.getElementById('searchInput').addEventListener('input', filtrarSugestoes);
+        document.getElementById('searchInput').addEventListener('keydown', event => {
+            if (event.key === 'Enter') acionarBuscaManual();
+        });
+        document.getElementById('searchButton').addEventListener('click', acionarBuscaManual);
+        window.addEventListener('load', carregarDados);
+    </script>
+</body>
+
+</html>
