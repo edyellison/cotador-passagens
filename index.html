@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cotação Aérea</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -422,6 +422,17 @@
             'latam': './assets/latam.png'
         };
 
+        const svgs = {
+            plane: `<svg viewBox="0 0 512 512" fill="currentColor" class="w-full h-full"><path d="M439.4 163.5c11.3 9.4 17 24.3 15 39.2l-23 170c-2.4 17.7-14.7 32-31.5 36.6l-84.3 22.8c-15.6 4.2-32.3-2.3-40.4-15.7l-46-76.3-51.5 13.9c-12 3.3-24.8 .7-34.6-7.1L94.5 304.7c-7.1-5.6-10.7-14.5-9.6-23.5l14.4-118c1.3-10.6 8.3-19.6 18.2-23.4l246.3-95c11.7-4.5 25.1-1.2 33.5 8.3l42.1 50.4z"/></svg>`,
+            arrowR: `<svg viewBox="0 0 448 512" fill="currentColor" class="w-full h-full"><path d="M438.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-160-160c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L338.8 224 32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l306.7 0-105.4 105.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l160-160z"/></svg>`,
+            cal: `<svg viewBox="0 0 448 512" fill="currentColor" class="w-full h-full"><path d="M152 24c0-13.3-10.7-24-24-24s-24 10.7-24 24V64H64C28.7 64 0 92.7 0 128v16 48V448c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V192 144 128c0-35.3-28.7-64-64-64H344V24c0-13.3-10.7-24-24-24s-24 10.7-24 24V64H152V24zM48 192H400V448c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V192z"/></svg>`,
+            usr: `<svg viewBox="0 0 448 512" fill="currentColor" class="w-full h-full"><path d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512H418.3c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304H178.3z"/></svg>`,
+            bcase: `<svg viewBox="0 0 512 512" fill="currentColor" class="w-full h-full"><path d="M184 48H328c4.4 0 8 3.6 8 8V96H176V56c0-4.4 3.6-8 8-8zm-56 8V96H64C28.7 96 0 124.7 0 160v96H192 320 512V160c0-35.3-28.7-64-64-64H384V56c0-30.9-25.1-56-56-56H184c-30.9 0-56 25.1-56 56zM512 288H320v32c0 17.7-14.3 32-32 32H224c-17.7 0-32-14.3-32-32V288H0V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V288z"/></svg>`,
+            sroll: `<svg viewBox="0 0 384 512" fill="currentColor" class="w-full h-full"><path d="M144 0c-26.5 0-48 21.5-48 48V96H48c-26.5 0-48 21.5-48 48V400c0 26.5 21.5 48 48 48v16c0 26.5 21.5 48 48 48h16c26.5 0 48-21.5 48-48V448h64v16c0 26.5 21.5 48 48 48h16c26.5 0 48-21.5 48-48V448c26.5 0 48-21.5 48-48V144c0-26.5-21.5-48-48-48H288V48c0-26.5-21.5-48-48-48H144zM144 48h96V96H144V48z"/></svg>`,
+            suit: `<svg viewBox="0 0 512 512" fill="currentColor" class="w-full h-full"><path d="M176 48h160c8.8 0 16 7.2 16 16v32H160V64c0-8.8 7.2-16 16-16zm-64 48H64C28.7 96 0 124.7 0 160V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V160c0-35.3-28.7-64-64-64H400V64c0-35.3-28.7-64-64-64H176C140.7 0 112 28.7 112 64V96zM64 160H448v96H64V160zm0 144H448v112H64V304z"/></svg>`,
+            info: `<svg viewBox="0 0 512 512" fill="currentColor" class="w-full h-full"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336h24V272H216c-13.3 0-24-10.7-24-24s10.7-24 24-24h48c13.3 0 24 10.7 24 24v88h8c13.3 0 24 10.7 24 24s-10.7 24-24 24H216c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>`
+        };
+
         function getLogoHtml(nomeCia) {
             if (!nomeCia) return '';
             const nomeLower = nomeCia.toLowerCase();
@@ -590,7 +601,7 @@
                     
                     <div class="bg-gradient-to-r from-blue-900 to-blue-700 p-6 text-white flex flex-col sm:flex-row items-center justify-between relative overflow-hidden">
                         <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform translate-x-10 -translate-y-5">
-                            <i class="fas fa-plane text-9xl"></i>
+                            <div class="w-32 h-32 text-blue-100">${svgs.plane}</div>
                         </div>
 
                         <div class="flex items-center gap-5 w-full sm:w-auto justify-center sm:justify-start z-10">
@@ -599,7 +610,7 @@
                                 <span class="text-xs text-blue-200 font-medium tracking-wide opacity-80 uppercase">${textoSeguro(tIda.oCode)}</span>
                             </div>
                             
-                            <i class="fas fa-arrow-right text-blue-400 text-sm"></i>
+                            <div class="w-3 h-3 text-blue-400">${svgs.arrowR}</div>
                             
                             <div class="text-left">
                                 <span class="font-extrabold text-xl sm:text-2xl leading-none block">${textoSeguro(tIda.dCity)}</span>
@@ -609,12 +620,12 @@
 
                         <div class="header-divider"></div>
                         <div class="flex items-center gap-3 my-4 sm:my-0 bg-blue-800/40 px-4 py-2 rounded-lg border border-white/10 backdrop-blur-sm z-10">
-                            <i class="far fa-calendar-alt text-blue-300"></i>
+                            <div class="w-4 h-4 text-blue-300">${svgs.cal}</div>
                             <span class="font-semibold text-sm tracking-wide">${textoSeguro(dados.idaData)} - ${textoSeguro(dados.voltaData)}</span>
                         </div>
                         <div class="header-divider"></div>
                         <div class="flex items-center gap-2 z-10">
-                            <div class="bg-white/10 p-2 rounded-full"><i class="far fa-user text-blue-200 text-xs"></i></div>
+                            <div class="bg-white/10 p-2 rounded-full"><div class="w-3 h-3 text-blue-200">${svgs.usr}</div></div>
                             <span class="font-semibold text-sm">${textoSeguro(dados.pax)} Passageiro(s)</span>
                         </div>
                     </div>
@@ -636,20 +647,20 @@
                                     <span class="text-xs text-slate-500 font-bold mb-3">${textoSeguro(dados.idaDuracao)}</span>
                                     <div class="w-full h-[2px] bg-slate-200 relative flex items-center justify-center rounded-full">
                                         <div class="absolute bg-white px-3 flex items-center justify-center">
-                                            <i class="fas fa-plane text-slate-300 transform rotate-90 text-xs"></i>
+                                            <div class="w-3 h-3 text-slate-300 transform rotate-90">${svgs.plane}</div>
                                         </div>
                                     </div>
                                     <span class="text-[10px] mt-3 font-extrabold uppercase tracking-widest ${idaDireto ? 'text-emerald-600' : 'text-orange-500'}">${textoSeguro(dados.idaTipo)}</span>
                                     
                                     <div class="flex gap-4 mt-5 justify-center items-end">
                                         <div class="flex flex-col items-center justify-end" title="Item Pessoal Incluso">
-                                            <i class="fa-solid fa-briefcase text-blue-600 text-sm mb-0.5"></i>
+                                            <div class="w-4 h-4 text-blue-600 mb-0.5">${svgs.bcase}</div>
                                         </div>
                                         <div class="flex flex-col items-center justify-end" title="Mala de Mão 10kg Inclusa">
-                                            <i class="fa-solid fa-suitcase-rolling text-blue-600 text-lg"></i>
+                                            <div class="w-5 h-5 text-blue-600">${svgs.sroll}</div>
                                         </div>
                                         <div class="flex flex-col items-center justify-end" title="Mala Despachada Não Inclusa">
-                                            <i class="fa-solid fa-suitcase text-slate-300 text-xl opacity-60"></i>
+                                            <div class="w-6 h-6 text-slate-300 opacity-60">${svgs.suit}</div>
                                         </div>
                                     </div>
 
@@ -677,20 +688,20 @@
                                     <span class="text-xs text-slate-500 font-bold mb-3">${textoSeguro(dados.voltaDuracao)}</span>
                                     <div class="w-full h-[2px] bg-slate-200 relative flex items-center justify-center rounded-full">
                                         <div class="absolute bg-white px-3 flex items-center justify-center">
-                                            <i class="fas fa-plane text-slate-300 transform -rotate-90 text-xs"></i>
+                                            <div class="w-3 h-3 text-slate-300 transform -rotate-90">${svgs.plane}</div>
                                         </div>
                                     </div>
                                     <span class="text-[10px] mt-3 font-extrabold uppercase tracking-widest ${voltaDireto ? 'text-emerald-600' : 'text-orange-500'}">${textoSeguro(dados.voltaTipo)}</span>
 
                                     <div class="flex gap-4 mt-5 justify-center items-end">
                                         <div class="flex flex-col items-center justify-end" title="Item Pessoal Incluso">
-                                            <i class="fa-solid fa-briefcase text-orange-600 text-sm mb-0.5"></i>
+                                            <div class="w-4 h-4 text-orange-600 mb-0.5">${svgs.bcase}</div>
                                         </div>
                                         <div class="flex flex-col items-center justify-end" title="Mala de Mão 10kg Inclusa">
-                                            <i class="fa-solid fa-suitcase-rolling text-orange-600 text-lg"></i>
+                                            <div class="w-5 h-5 text-orange-600">${svgs.sroll}</div>
                                         </div>
                                         <div class="flex flex-col items-center justify-end" title="Mala Despachada Não Inclusa">
-                                            <i class="fa-solid fa-suitcase text-slate-300 text-xl opacity-60"></i>
+                                            <div class="w-6 h-6 text-slate-300 opacity-60">${svgs.suit}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -719,7 +730,7 @@
                             </div>
                             
                             <p class="text-xs text-slate-400 mt-3 flex items-center justify-center sm:justify-start gap-1">
-                                <i class="fas fa-info-circle text-slate-300"></i>
+                                <span class="w-3 h-3 inline-block text-slate-300">${svgs.info}</span>
                                 Taxas e impostos: <span class="font-bold text-slate-600">${textoSeguro(totalTaxas)}</span>
                             </p>
 
@@ -760,12 +771,15 @@
             if (acoes) acoes.style.visibility = 'hidden';
 
             try {
-                const dataUrl = await htmlToImage.toPng(container, {
-                    pixelRatio: 2,
+                const canvas = await html2canvas(container, {
+                    scale: 2,
                     backgroundColor: '#ffffff',
-                    style: { margin: '0' }
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false
                 });
-                
+
+                const dataUrl = canvas.toDataURL('image/png');
                 const link = document.createElement('a');
                 link.download = `cotacao_ct${idCotacao}.png`;
                 link.href = dataUrl;
